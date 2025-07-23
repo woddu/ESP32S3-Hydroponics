@@ -1,0 +1,407 @@
+#include "hydroponics.h"
+
+#define SERVICE_UUID            "9ce8f60d-c116-42dd-852d-fd59028e84eb"
+#define TDS_NOTIFY_UUID         "be0fc4c1-f772-4f20-9801-2ab78030a2a9"
+#define LDR_NOTIFY_UUID         "be0fc4c2-f772-4f20-9801-2ab78030a2a9"
+#define DATE_NOTIFY_UUID        "be0fc4c3-f772-4f20-9801-2ab78030a2a9"
+// #define HYDROSTATE_NOTIFY_UUID "be0fc4c4-f772-4f20-9801-2ab78030a2a9"
+// #define TESTSTATE_NOTIFY_UUID "be0fc4c5-f772-4f20-9801-2ab78030a2a9"
+#define RGB_WRITE_UUID          "b4a535a1-2a27-419c-8257-9cfcc67d6fd6"
+#define DATE_WRITE_UUID         "b4a535a2-2a27-419c-8257-9cfcc67d6fd6"
+#define STARTATMPT_WRITE_UUID   "b4a535a3-2a27-419c-8257-9cfcc67d6fd6"
+
+BLEServer *pServer = NULL;
+BLECharacteristic *pNotifyTDS_pH = NULL;
+BLECharacteristic *pNotifyLight_DHT = NULL;
+BLECharacteristic *pNotifyDateSynced = NULL;
+// BLECharacteristic *pNotifyHydroponicState = NULL;
+// BLECharacteristic *pNotifyTestLog = NULL;
+// BLECharacteristic *pNotifyErrorLog = NULL;
+/*
+    things to recieve
+    actions - tbd* pause stop test start
+    date
+
+*/
+bool deviceConnected = false;
+bool oldDeviceConnected = false;
+
+int rgb;
+
+class MyServerCallbacks : public BLEServerCallbacks{
+    void onConnect(BLEServer *pServer)
+    {
+        deviceConnected = true;
+    };
+
+    void onDisconnect(BLEServer *pServer)
+    {
+        deviceConnected = false;
+    }
+};
+
+class RGBCallBack : public BLECharacteristicCallbacks{
+    void onWrite(BLECharacteristic *pCharacteristic)
+    {
+        std::string rxValue = pCharacteristic->getValue();
+        char myArray[rxValue.size() + 1]; // as 1 char space for null is also required
+        strcpy(myArray, rxValue.c_str());
+        if (rxValue.length() > 0)
+        {
+            try {
+                rgb = std::stoi(rxValue);
+                
+            } catch (const std::exception& e) {
+                rgb = random(0,6);
+            }
+            Serial.println(rxValue.c_str());
+        }
+    };
+};
+
+class DateCallBack : public BLECharacteristicCallbacks{
+    void onWrite(BLECharacteristic *pCharacteristic)
+    {
+        std::string rxValue = pCharacteristic->getValue();
+        char myArray[rxValue.size() + 1]; // as 1 char space for null is also required
+        strcpy(myArray, rxValue.c_str());
+        if (rxValue.length() > 0)
+        {
+            try {
+                unsigned int t = std::stoul(rxValue);
+                struct timeval now = { .tv_sec = t }; 
+                settimeofday(&now, NULL); 
+                pNotifyDateSynced->setValue("Synced");
+                pNotifyDateSynced->notify();
+                Serial.println("Convertion Successful");
+            } catch (const std::exception& e) {
+                // notify Date Synced
+                pNotifyDateSynced->setValue("Not Synced");
+                pNotifyDateSynced->notify();
+                Serial.println("Convertion Unsuccessful");
+            }
+            Serial.println(rxValue.c_str());
+        }
+    };
+};
+
+class StartAttemptCallBack : public BLECharacteristicCallbacks{
+    void onWrite(BLECharacteristic *pCharacteristic)
+    {
+        std::string rxValue = pCharacteristic->getValue();
+        char myArray[rxValue.size() + 1]; // as 1 char space for null is also required
+        strcpy(myArray, rxValue.c_str());
+        if (rxValue.length() > 0)
+        {
+            if (rxValue == "start"){
+                Serial.println("Attempting to Start");
+                
+            } else if (rxValue == "pause"){
+                Serial.println("Attempting to Pause");
+                
+            }
+            Serial.println(rxValue.c_str());
+        }
+    };
+};
+
+void DateandTime(void * param){
+
+    while(1){
+
+    }
+}
+
+void ServoLEDHumidifier(void * param){
+
+    servo.attach(SERVO);
+    pinMode(GROW_LED, OUTPUT);
+    pinMode(HUMIDIFIER, OUTPUT);
+
+    while(1){
+        if(started){
+            
+        }
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
+
+void Pumps(void * param){
+
+    pinMode(WATER_PUMP, OUTPUT);
+    pinMode(WATER_DRAIN, OUTPUT);
+    pinMode(AIR_PUMP, OUTPUT);
+
+    while(1){
+        if(started){
+            digitalWrite(WATER_PUMP, HIGH);
+            digitalWrite(AIR_PUMP, HIGH);
+            digitalWrite(WATER_DRAIN, LOW);
+        } else if (paused){
+            digitalWrite(WATER_PUMP, LOW);
+            digitalWrite(AIR_PUMP, LOW);
+            digitalWrite(WATER_DRAIN, LOW);
+        } else if (draining){
+            digitalWrite(WATER_PUMP, LOW);
+            digitalWrite(AIR_PUMP, LOW);
+            digitalWrite(WATER_DRAIN, HIGH);
+        }
+        vTaskDelay(50 / portTICK_PERIOD_MS);
+    }
+}
+
+void BLE(void *param){
+    while(1){
+        if (!deviceConnected && oldDeviceConnected) {
+            vTaskDelay(500 / portTICK_PERIOD_MS);
+            pServer->startAdvertising();
+            Serial.println("start advertising");
+            oldDeviceConnected = deviceConnected;
+        }
+        // connecting
+        if (deviceConnected && !oldDeviceConnected) {
+            // do stuff here on connecting
+            oldDeviceConnected = deviceConnected;
+        }
+        vTaskDelay(5 / portTICK_PERIOD_MS);
+    }
+}
+
+void DHTandLDR(void * param){
+
+    int16_t ldr0, ldr1 , ldr2, ldr3;
+    float volt0, volt1 , volt2, volt3;
+
+    while(1){
+
+    }
+}
+
+void TDSandPH(void *param){
+    String bleValue;
+    bleValue.reserve(30);
+    unsigned long prevMillis;
+
+    int16_t adc0, adc1;
+    float volt0, volt1;
+
+    while (1)
+    {
+        digitalWrite(TDS_TOGGLE, 1);
+
+        vTaskDelay(25 / portTICK_PERIOD_MS);
+        analogBuffer[analogBufferIndex] = ads.readADC_SingleEnded(1); // read the analog value and store into the buffer
+        analogBufferIndex++;
+        if (analogBufferIndex == SCOUNT)
+        {
+            analogBufferIndex = 0;
+            for (copyIndex = 0; copyIndex < SCOUNT; copyIndex++)
+            {
+                analogBufferTemp[copyIndex] = analogBuffer[copyIndex];
+            }
+            // read the analog value more stable by the median filtering algorithm, and convert to voltage value
+            // averageVoltage = getMedianNum(analogBufferTemp, SCOUNT) * (float)VREF / 4096.0;
+            Serial0.printf("median: %d, volts: %.2f, manual volts: %.2f\n", getMedianNum(analogBufferTemp, SCOUNT), ads.computeVolts(getMedianNum(analogBufferTemp, SCOUNT)), (getMedianNum(analogBufferTemp, SCOUNT) *3.3/ 17545));
+            averageVoltage = ads.computeVolts(getMedianNum(analogBufferTemp, SCOUNT));
+            // temperature compensation formula: fFinalResult(25^C) = fFinalResult(current)/(1.0+0.02*(fTP-25.0));
+            float compensationCoefficient = 1.0 + 0.02 * (temperature - 25.0);
+            // temperature compensation
+            float compensationVoltage = averageVoltage / compensationCoefficient;
+
+            // convert voltage value to tds value
+
+            tdsValue = (133.42 * compensationVoltage * compensationVoltage * compensationVoltage - 255.86 * compensationVoltage * compensationVoltage + 857.39 * compensationVoltage) * 0.5;
+        }
+        digitalWrite(TDS_TOGGLE, 0);
+        vTaskDelay(25 / portTICK_PERIOD_MS);
+        float total = 0.0;
+        for (int i = 0; i < 30; i++)
+        {
+
+            adc0 = ads.readADC_SingleEnded(0);
+            volt0 = ads.computeVolts(adc0);
+
+            pH_Val = m * volt0 + b;
+            total += pH_Val;
+            vTaskDelay(1 / portTICK_PERIOD_MS);
+        }
+
+        averagepH_Value = total / 30.0;
+
+        if (millis() - prevMillis >= 1500)
+        {
+            prevMillis = millis();
+            Serial0.printf("a0: %d, a1: %d, a2: %d, a3: %d\n", adc0, ads.readADC_SingleEnded(1), LDRs.readADC_SingleEnded(0), LDRs.readADC_SingleEnded(1));
+            if (deviceConnected)
+            {
+                bleValue += String(tdsValue, 1);
+                bleValue += ",";
+                bleValue += String(averagepH_Value, 1);
+                Serial0.println(bleValue);
+                pNotifyTDS_pH->setValue(bleValue.c_str());
+                pNotifyTDS_pH->notify();
+                bleValue.remove(0);
+            }
+        }
+    }
+}
+
+void RGBLed(void *param){
+    pinMode(48, OUTPUT);
+    while (1){
+        switch (rgb)
+        {
+        case 0:
+            neopixelWrite(48, 0,0,0);
+            break;
+        case 1:
+            neopixelWrite(48, 255,0,0);
+            break;
+        case 2:
+            neopixelWrite(48, 0,255,0);
+            break;
+        case 3:
+            neopixelWrite(48, 0,0,255);
+            break;
+        case 4:
+            neopixelWrite(48, 0,127,128);
+            break;
+        case 5:
+            neopixelWrite(48, 127,128,0);
+            break;
+        case 6:
+            neopixelWrite(48, 127,128,0);
+            break;
+        
+        default:
+            neopixelWrite(48, random(0,255),random(0,255),random(0,255));
+            break;
+        }
+        vTaskDelay(250 / portTICK_PERIOD_MS);
+    }
+}
+
+void setup(){
+
+    Serial0.begin(115200);
+
+    BLEDevice::init("Hyrdoponics");
+
+    pServer = BLEDevice::createServer();
+    pServer->setCallbacks(new MyServerCallbacks());
+
+    // Create the BLE Service
+    BLEService *pService = pServer->createService(BLEUUID(SERVICE_UUID), 40);
+
+    pNotifyTDS_pH = pService->createCharacteristic(
+        TDS_NOTIFY_UUID,
+        BLECharacteristic::PROPERTY_NOTIFY
+    );
+
+    pNotifyLight_DHT = pService->createCharacteristic(
+        LDR_NOTIFY_UUID,
+        BLECharacteristic::PROPERTY_NOTIFY
+    );
+
+    pNotifyDateSynced = pService->createCharacteristic(
+        DATE_NOTIFY_UUID,
+        BLECharacteristic::PROPERTY_NOTIFY
+    );
+
+    BLE2902 *pBLE2902_1 = new BLE2902();
+    pBLE2902_1->setNotifications(true);
+    pNotifyTDS_pH->addDescriptor(pBLE2902_1);
+    BLE2902 *pBLE2902_2 = new BLE2902();
+    pBLE2902_2->setNotifications(true);
+    pNotifyLight_DHT->addDescriptor(pBLE2902_2);
+    BLE2902 *pBLE2902_3 = new BLE2902();
+    pBLE2902_3->setNotifications(true);
+    pNotifyDateSynced->addDescriptor(pBLE2902_3);
+    
+    BLECharacteristic * pRGBWrite = pService->createCharacteristic(
+        RGB_WRITE_UUID,
+        BLECharacteristic::PROPERTY_WRITE
+    );
+    pRGBWrite->setCallbacks(new RGBCallBack());
+
+    BLECharacteristic * pDateWrite = pService->createCharacteristic(
+        DATE_WRITE_UUID,
+        BLECharacteristic::PROPERTY_WRITE
+    );
+    pDateWrite->setCallbacks(new DateCallBack());
+    
+    BLECharacteristic * pStartWrite = pService->createCharacteristic(
+        STARTATMPT_WRITE_UUID,
+        BLECharacteristic::PROPERTY_WRITE
+    );
+    pStartWrite->setCallbacks(new StartAttemptCallBack());
+
+    pService->start();
+
+    BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+    pAdvertising->addServiceUUID(SERVICE_UUID);
+    pAdvertising->setScanResponse(false);
+    pAdvertising->setMinPreferred(0x0); // set value to 0x00 to not advertise this parameter
+    BLEDevice::startAdvertising();
+
+    if (!ads.begin(0x48)) {
+        Serial0.println("Failed to initialize ads.");
+        while (1);
+    }
+    if (!LDRs.begin(0x49)) {
+        Serial0.println("Failed to initialize LDRs.");
+        while (1);
+    }
+
+    pinMode(TDS_TOGGLE, OUTPUT);
+
+    phCalibration();
+
+    /*
+        with ads1115
+        ads1115 resolution
+        <= 8
+        >= 17540 
+        m = (4.01 - 6.86) / (3.1024 - 2.62);
+
+        b = 6.86 - m * 2.62;
+    */
+
+    xTaskCreatePinnedToCore(
+        RGBLed,
+        "RGB LED",
+        2048,
+        NULL,
+        1,
+        NULL,
+        1
+    );
+
+    xTaskCreatePinnedToCore(
+        TDSandPH,
+        "TDS and PH",
+        3072,
+        NULL,
+        1,
+        NULL,
+        1
+    );
+
+    xTaskCreatePinnedToCore(
+        BLE,
+        "BLE",
+        3072,
+        NULL,
+        1,
+        NULL,
+        1
+    );
+
+   
+    
+}
+
+void loop(){
+
+}
+
