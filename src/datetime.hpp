@@ -1,3 +1,4 @@
+#pragma once
 #define HOUR 3600UL
 #define DAY 86400UL
 

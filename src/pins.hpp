@@ -1,3 +1,5 @@
+#pragma once
+
 #define TDS_TOGGLE    1
 #define RESERVOIR     21
 #define WATER_PUMP    47

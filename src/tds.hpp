@@ -1,3 +1,5 @@
+#pragma once
+
 #define SCOUNT  20
 
 int analogBuffer[SCOUNT];     // store the analog value in the array, read from ADC
@@ -9,7 +11,7 @@ float averageVoltage = 0;
 float tdsValue = 0;
 float temperature = 25;       // current temperature for compensation
 
-int getMedianNum(int bArray[], int iFilterLen){
+int getMedianNum(int &bArray[], int &iFilterLen){
     int bTab[iFilterLen];
     for (unsigned char i = 0; i<iFilterLen; i++)
     bTab[i] = bArray[i];

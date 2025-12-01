@@ -1,3 +1,4 @@
+#pragma once
 #include <Arduino.h>
 #include <Time.h>
 #include <Preferences.h>
@@ -11,11 +12,11 @@
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
 #include <DHT_U.h>
-#include "tft.h"
-#include "tds.h"
-#include "phsensor.h"
-#include "pins.h"
-#include "datetime.h"
+#include "tft.hpp"
+#include "tds.hpp"
+#include "phsensor.hpp"
+#include "pins.hpp"
+#include "datetime.hpp"
 
 
 #define LOG_DRAINING_STOP       "Log12"
@@ -73,50 +74,50 @@ static int darkHour = 6;
 
 int lightDarkCounter;
 
-bool countingLight = true;
+inline bool countingLight = true;
 
-bool Starting(){
+inline bool Starting() {
   return startAttempt && !prepared && !started;
 }
 
-bool Pausing(){
+inline bool Pausing() {
   return pauseAttempt && started;
 }
 
-bool Resuming(){
+inline bool Resuming() {
   return startAttempt && started;
 }
 
-bool Prepared(){
+inline bool Prepared() {
   return !startAttempt && prepared && !started;
 }
 
-bool Started(){
+inline bool Started() {
   return started && prepared && !paused;
 }
 
-bool Paused(){
+inline bool Paused() {
   return started && paused;
 }
 
-bool Draining(){
+inline bool Draining() {
   return draining;
 }
 
-bool NotRunning(){
+inline bool NotRunning() {
   return !started && !paused && !prepared;
 }
 
-unsigned long LightHour(){
+inline unsigned long LightHour() {
   return (unsigned long)lightHour * HOUR;
 }
 
-unsigned long DarkHour(){
+inline unsigned long DarkHour() {
   return (unsigned long)darkHour * HOUR;
 }
 
 
-void TFTPrint(int x, int y, String print, uint16_t color = onSurfaceVariant, int size = 1){
+void TFTPrint(const int &x, const int &y, const String &print, const uint16_t &color = onSurfaceVariant, const int &size = 1){
   tft.setTextColor(color);
   tft.setTextSize(size);
   tft.getTextBounds(print, 0, 0, &xBuf, &yBuf, &wBuf, &hBuf);
@@ -131,8 +132,8 @@ void TFTPrint(int x, int y, String print, uint16_t color = onSurfaceVariant, int
 }
 
 void RectWithCenteredText(
-  bool fill, int16_t rectX, int16_t rectY, int16_t rectWidth, int16_t rectHeight, uint16_t rectColor, 
-  String print, uint16_t color = onPrimaryContainer, int size = 1, int16_t margin = 0
+  const bool &fill, const int16_t &rectX, const int16_t &rectY, const int16_t &rectWidth, const int16_t &rectHeight, const uint16_t &rectColor, 
+  const String &print, const uint16_t &color = onPrimaryContainer, const int &size = 1, const int16_t &margin = 0
 ){
   tft.setTextSize(size);
 
@@ -159,7 +160,7 @@ void RectWithCenteredText(
   TFTPrint(textX - 2, textY - 2, print, color, size);
 }
 
-bool ScreenChanged(){
+bool ScreenChanged() {
   if(GUI.screenChanged){
     GUI.screenChanged = !GUI.screenChanged;
     return !GUI.screenChanged;
@@ -168,7 +169,7 @@ bool ScreenChanged(){
   }
 }
 
-void TFTLeftPanel(void * param){
+void TFTLeftPanel(void *param){
   uint32_t ulNotificationValue;
 
   while(1){
@@ -211,9 +212,9 @@ void TFTLeftPanel(void * param){
     vTaskDelay(10 / portTICK_PERIOD_MS);
   }
 }
-int ChildPanelX(int x){ return x + 80; }
-int ChildPanelY(int y){ return y + 60; }
-void TFTChildPanel(void * param){
+inline int ChildPanelX(const int &x){ return x + 80; }
+inline int ChildPanelY(const int &y){ return y + 60; }
+void TFTChildPanel(void *param){
   uint32_t ulNotificationValue;
   
   const int childPanelWidth = 240, childPanelHeight = 180;
@@ -476,7 +477,7 @@ void TFTChildPanel(void * param){
   }
 }
 
-void Joystick(void * param){
+void Joystick(void *param){
 
   int prevX, prevY;
   int currX, currY;

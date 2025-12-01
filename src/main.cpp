@@ -1,4 +1,4 @@
-#include "hydroponics.h"
+#include "hydroponics.hpp"
 
 #define LOG_RUNNING             "Log0"
 #define LOG_PAUSED              "Log1"
